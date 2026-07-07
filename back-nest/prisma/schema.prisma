@@ -1,0 +1,345 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["views"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model user {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  userName  String   @unique @db.VarChar(100)
+  password  String   @db.VarChar(255)
+  roleId    Int
+  role      role     @relation(fields: [roleId], references: [id])
+  state     Boolean  @default(true) @db.Boolean
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  // Back-relations de los modelos académicos (profesor/alumno son user + role)
+  enrollments         enrollment[]
+  teachingAssignments teachingAssignment[]
+  submissions         submission[]
+  grades              grade[]
+  termGrades          termGrade[]
+}
+
+model role {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(50)
+  state     Boolean  @default(true) @db.Boolean
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  users                  user[]
+  permissions            rolePermission[]
+  menuSectionPermissions menuSectionPermission[]
+}
+
+model permission {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(100)
+  state     Boolean  @default(true) @db.Boolean
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  roles rolePermission[]
+}
+
+model rolePermission {
+  id           Int        @id @default(autoincrement())
+  role         role       @relation(fields: [roleId], references: [id])
+  roleId       Int
+  permission   permission @relation(fields: [permissionId], references: [id])
+  permissionId Int
+  state        Boolean    @default(true)
+  createdAt    DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime   @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+model menuSection {
+  id        Int          @id @default(autoincrement())
+  key       String       @unique @db.VarChar(100)
+  label     String       @db.VarChar(100)
+  href      String       @db.VarChar(255)
+  icon      String       @db.VarChar(50)
+  order     Int          @default(0)
+  parentId  Int?
+  parent    menuSection? @relation("MenuSectionParent", fields: [parentId], references: [id])
+  state     Boolean      @default(true)
+  createdAt DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime     @default(now()) @updatedAt @db.Timestamptz(6)
+
+  children    menuSection[]           @relation("MenuSectionParent")
+  permissions menuSectionPermission[]
+}
+
+model menuSectionPermission {
+  id            Int         @id @default(autoincrement())
+  menuSection   menuSection @relation(fields: [menuSectionId], references: [id])
+  menuSectionId Int
+  role          role?       @relation(fields: [roleId], references: [id])
+  roleId        Int?
+  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime    @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+// ============================================================================
+// ENTIDADES ACADÉMICAS — LMS tipo colegio
+// Jerarquía (DAG, sin ciclos):
+//   institution -> level -> classGroup -> teachingAssignment -> lesson/task
+//   institution -> subject -> teachingAssignment -> schedule/termGrade
+//   task -> submission -> grade
+// Profesor/alumno son "user" filtrados por role (no se duplican como modelos).
+// ============================================================================
+
+// --- Enums -----------------------------------------------------------------
+
+enum submissionStatus {
+  pendiente
+  entregada
+  calificada
+}
+
+enum taskType {
+  documento
+  examen
+}
+
+enum term {
+  primerParcial
+  segundoParcial
+  tercerParcial
+  final
+}
+
+// Nombres sin tilde (requisito de Prisma). El mapeo a la etiqueta con tilde
+// (miércoles, sábado) se resuelve en la capa de presentación.
+enum weekDay {
+  domingo
+  lunes
+  martes
+  miercoles
+  jueves
+  viernes
+  sabado
+}
+
+// --- Modelos ---------------------------------------------------------------
+
+model institution {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(150)
+  description String?  @db.Text
+  state       Boolean  @default(true) @db.Boolean
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  levels      level[]
+  subjects    subject[]
+  classGroups classGroup[]
+}
+
+model level {
+  id            Int         @id @default(autoincrement())
+  name          String      @db.VarChar(50)
+  order         Int         @default(0)
+  institutionId Int
+  institution   institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  state         Boolean     @default(true) @db.Boolean
+  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime    @default(now()) @updatedAt @db.Timestamptz(6)
+
+  classGroups classGroup[]
+}
+
+model subject {
+  id            Int         @id @default(autoincrement())
+  name          String      @unique @db.VarChar(100)
+  institutionId Int
+  institution   institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  state         Boolean     @default(true) @db.Boolean
+  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime    @default(now()) @updatedAt @db.Timestamptz(6)
+
+  teachingAssignments teachingAssignment[]
+}
+
+model classGroup {
+  id            Int         @id @default(autoincrement())
+  parallel      String      @db.VarChar(10)
+  levelId       Int
+  level         level       @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  institutionId Int
+  institution   institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  state         Boolean     @default(true) @db.Boolean
+  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime    @default(now()) @updatedAt @db.Timestamptz(6)
+
+  enrollments         enrollment[]
+  teachingAssignments teachingAssignment[]
+
+  @@unique([levelId, parallel])
+}
+
+// Tabla intermedia N:M entre user (alumno) y classGroup
+model enrollment {
+  id           Int        @id @default(autoincrement())
+  classGroupId Int
+  classGroup   classGroup @relation(fields: [classGroupId], references: [id], onDelete: Cascade)
+  studentId    Int
+  student      user       @relation(fields: [studentId], references: [id])
+  state        Boolean    @default(true)
+  createdAt    DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime   @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@unique([classGroupId, studentId])
+}
+
+// La "clase" real: profesor + materia + paralelo. Dueña del material.
+model teachingAssignment {
+  id           Int        @id @default(autoincrement())
+  subjectId    Int
+  subject      subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  classGroupId Int
+  classGroup   classGroup @relation(fields: [classGroupId], references: [id], onDelete: Cascade)
+  teacherId    Int
+  teacher      user       @relation(fields: [teacherId], references: [id])
+  state        Boolean    @default(true) @db.Boolean
+  createdAt    DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime   @default(now()) @updatedAt @db.Timestamptz(6)
+
+  lessons    lesson[]
+  tasks      task[]
+  schedules  schedule[]
+  termGrades termGrade[]
+
+  // Una materia se asigna una sola vez por paralelo (un profesor por materia+paralelo)
+  @@unique([subjectId, classGroupId])
+}
+
+model lesson {
+  id                   Int                @id @default(autoincrement())
+  teachingAssignmentId Int
+  teachingAssignment   teachingAssignment @relation(fields: [teachingAssignmentId], references: [id], onDelete: Cascade)
+  title                String             @db.VarChar(150)
+  content              String?            @db.Text
+  order                Int                @default(0)
+  state                Boolean            @default(true) @db.Boolean
+  createdAt            DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime           @default(now()) @updatedAt @db.Timestamptz(6)
+
+  tasks task[]
+}
+
+model task {
+  id                   Int                @id @default(autoincrement())
+  teachingAssignmentId Int
+  teachingAssignment   teachingAssignment @relation(fields: [teachingAssignmentId], references: [id], onDelete: Cascade)
+  lessonId             Int?
+  lesson               lesson?            @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  title                String             @db.VarChar(150)
+  description          String?            @db.Text
+  type                 taskType           @default(documento)
+  dueDate              DateTime?          @db.Timestamptz(6)
+  maxScore             Decimal            @default(10) @db.Decimal(5, 2)
+  state                Boolean            @default(true) @db.Boolean
+  createdAt            DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime           @default(now()) @updatedAt @db.Timestamptz(6)
+
+  submissions submission[]
+  questions   question[]
+}
+
+model schedule {
+  id                   Int                @id @default(autoincrement())
+  teachingAssignmentId Int
+  teachingAssignment   teachingAssignment @relation(fields: [teachingAssignmentId], references: [id], onDelete: Cascade)
+  dayOfWeek            weekDay
+  startTime            DateTime           @db.Time(3)
+  endTime              DateTime           @db.Time(3)
+  state                Boolean            @default(true) @db.Boolean
+  createdAt            DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime           @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+model submission {
+  id          Int              @id @default(autoincrement())
+  taskId      Int
+  task        task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  studentId   Int
+  student     user             @relation(fields: [studentId], references: [id])
+  fileUrl     String?          @db.VarChar(255)
+  comment     String?          @db.Text
+  answers     Json?
+  submittedAt DateTime         @default(now()) @db.Timestamptz(6)
+  status      submissionStatus @default(pendiente)
+  state       Boolean          @default(true) @db.Boolean
+  createdAt   DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
+
+  grade grade?
+
+  // Una entrega por alumno por tarea (re-entrega = editar la misma fila)
+  @@unique([taskId, studentId])
+}
+
+// Pregunta de un cuestionario (task de tipo examen)
+model question {
+  id     Int     @id @default(autoincrement())
+  taskId Int
+  task   task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  text   String  @db.Text
+  order  Int     @default(0)
+  state  Boolean @default(true) @db.Boolean
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  options option[]
+}
+
+// Opción de respuesta de una pregunta
+model option {
+  id         Int      @id @default(autoincrement())
+  questionId Int
+  question   question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text       String   @db.VarChar(300)
+  isCorrect  Boolean  @default(false)
+  order      Int      @default(0)
+  state      Boolean  @default(true) @db.Boolean
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+model grade {
+  id           Int        @id @default(autoincrement())
+  submissionId Int        @unique
+  submission   submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  score        Decimal    @db.Decimal(5, 2)
+  feedback     String?    @db.Text
+  gradedById   Int
+  gradedBy     user       @relation(fields: [gradedById], references: [id])
+  gradedAt     DateTime   @default(now()) @db.Timestamptz(6)
+  state        Boolean    @default(true) @db.Boolean
+  createdAt    DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime   @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+model termGrade {
+  id                   Int                @id @default(autoincrement())
+  teachingAssignmentId Int
+  teachingAssignment   teachingAssignment @relation(fields: [teachingAssignmentId], references: [id], onDelete: Cascade)
+  studentId            Int
+  student              user               @relation(fields: [studentId], references: [id])
+  term                 term
+  score                Decimal            @db.Decimal(5, 2)
+  observations         String?            @db.Text
+  state                Boolean            @default(true) @db.Boolean
+  createdAt            DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime           @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@unique([teachingAssignmentId, studentId, term])
+}
