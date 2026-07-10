@@ -1,17 +1,21 @@
 import { apiFetch, jsonBody, jsonHeaders } from '@/lib/apiFetch'
 import {
+  CreateAnnouncementInput,
   CreateLessonInput,
   CreateTaskInput,
   CreateTermGradeInput,
   GradeSubmissionInput,
   SubmitTaskInput,
+  UpdateAnnouncementInput,
   UpdateLessonInput,
   UpdateTaskInput
 } from '../domain/academicInputs'
 import { AcademicRepository } from '../domain/academicRepository'
 import {
+  Announcement,
   Grade,
   Lesson,
+  MyAnnouncement,
   MyEnrollment,
   MyGrades,
   MyLesson,
@@ -157,10 +161,49 @@ export const apiAcademic = (): AcademicRepository => {
     }) as Promise<TermGrade>
   }
 
+  // Anuncios
+  const getMyAnnouncements = async () => {
+    return apiFetch(`${API}/academic/my-announcements`, {
+      method: 'GET',
+      headers
+    }) as Promise<MyAnnouncement[]>
+  }
+
+  const getTeacherAnnouncements = async (assignmentId: number) => {
+    return apiFetch(`${API}/academic/teacher/announcements/${assignmentId}`, {
+      method: 'GET',
+      headers
+    }) as Promise<Announcement[]>
+  }
+
+  const createAnnouncement = async (data: CreateAnnouncementInput) => {
+    return apiFetch(`${API}/academic/teacher/announcements`, {
+      method: 'POST',
+      headers,
+      body: jsonBody(data)
+    }) as Promise<Announcement>
+  }
+
+  const editAnnouncement = async (id: number, data: UpdateAnnouncementInput) => {
+    return apiFetch(`${API}/academic/teacher/announcements/${id}`, {
+      method: 'PATCH',
+      headers,
+      body: jsonBody(data)
+    }) as Promise<Announcement>
+  }
+
+  const deleteAnnouncement = async (id: number) => {
+    await apiFetch(`${API}/academic/teacher/announcements/${id}`, {
+      method: 'DELETE',
+      noJson: true
+    })
+  }
+
   return {
     getMyClasses,
     getMyTasks,
     getMyLessons,
+    getMyAnnouncements,
     getMyGrades,
     submitTask,
     getTeacherAssignments,
@@ -174,6 +217,10 @@ export const apiAcademic = (): AcademicRepository => {
     deleteTask,
     getSubmissionsForTask,
     gradeSubmission,
-    createTermGrade
+    createTermGrade,
+    getTeacherAnnouncements,
+    createAnnouncement,
+    editAnnouncement,
+    deleteAnnouncement
   }
 }

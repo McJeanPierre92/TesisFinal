@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common'
 import { submissionStatus } from '@prisma/client'
 import { PrismaService } from 'src/storage/postgres/prisma.service'
+import { CreateAnnouncementByTeacherDto } from './dto/create-announcement-by-teacher.dto'
 import { CreateGradeByTeacherDto } from './dto/create-grade-by-teacher.dto'
 import { CreateLessonByTeacherDto } from './dto/create-lesson-by-teacher.dto'
 import { CreateSubmissionByStudentDto } from './dto/create-submission-by-student.dto'
@@ -35,6 +36,10 @@ export class AcademicService {
                 schedules: {
                   where: { state: true },
                   orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }]
+                },
+                announcements: {
+                  where: { state: true },
+                  orderBy: { createdAt: 'desc' }
                 }
               }
             }
@@ -617,5 +622,92 @@ export class AcademicService {
   async deleteTaskByTeacher(teacherId: number, taskId: number) {
     await this.assertOwnsTask(teacherId, taskId)
     return this.prisma.task.delete({ where: { id: taskId } })
+  }
+
+  // ============================================================
+  //  ANUNCIOS (tablón del curso)
+  // ============================================================
+
+  /** Anuncios de los paralelos del alumno */
+  async findMyAnnouncements(studentId: number) {
+    const myClassGroups = await this.prisma.enrollment.findMany({
+      where: { studentId, state: true },
+      select: { classGroupId: true }
+    })
+    const classGroupIds = myClassGroups.map((e) => e.classGroupId)
+    if (classGroupIds.length === 0) return []
+
+    const assignments = await this.prisma.teachingAssignment.findMany({
+      where: { classGroupId: { in: classGroupIds }, state: true },
+      select: { id: true }
+    })
+    const assignmentIds = assignments.map((a) => a.id)
+
+    return this.prisma.announcement.findMany({
+      where: { teachingAssignmentId: { in: assignmentIds }, state: true },
+      include: {
+        teachingAssignment: {
+          select: {
+            id: true,
+            subject: { select: { id: true, name: true } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+  }
+
+  /** Anuncios de una asignación del profesor */
+  async findTeacherAnnouncements(teacherId: number, assignmentId: number) {
+    await this.assertOwnsAssignment(teacherId, assignmentId)
+    return this.prisma.announcement.findMany({
+      where: { teachingAssignmentId: assignmentId, state: true },
+      orderBy: { createdAt: 'desc' }
+    })
+  }
+
+  async createAnnouncementByTeacher(
+    teacherId: number,
+    dto: CreateAnnouncementByTeacherDto
+  ) {
+    await this.assertOwnsAssignment(teacherId, dto.teachingAssignmentId)
+    return this.prisma.announcement.create({
+      data: {
+        teachingAssignmentId: dto.teachingAssignmentId,
+        title: dto.title,
+        content: dto.content
+      }
+    })
+  }
+
+  /** Valida que un anuncio pertenezca a una asignación del profesor */
+  private async assertOwnsAnnouncement(teacherId: number, announcementId: number) {
+    const announcement = await this.prisma.announcement.findUnique({
+      where: { id: announcementId },
+      include: { teachingAssignment: { select: { teacherId: true } } }
+    })
+    if (!announcement) throw new NotFoundException('Anuncio no encontrado')
+    if (announcement.teachingAssignment.teacherId !== teacherId) {
+      throw new ForbiddenException('Este anuncio no te pertenece')
+    }
+    return announcement
+  }
+
+  async updateAnnouncementByTeacher(
+    teacherId: number,
+    announcementId: number,
+    dto: Partial<CreateAnnouncementByTeacherDto>
+  ) {
+    await this.assertOwnsAnnouncement(teacherId, announcementId)
+    const { teachingAssignmentId, ...data } = dto
+    return this.prisma.announcement.update({
+      where: { id: announcementId },
+      data
+    })
+  }
+
+  async deleteAnnouncementByTeacher(teacherId: number, announcementId: number) {
+    await this.assertOwnsAnnouncement(teacherId, announcementId)
+    return this.prisma.announcement.delete({ where: { id: announcementId } })
   }
 }

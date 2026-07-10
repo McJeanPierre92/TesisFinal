@@ -51,3 +51,14 @@ export type UpdateTaskInput = {
   maxScore?: number
   lessonId?: number | null
 }
+
+export type CreateAnnouncementInput = {
+  teachingAssignmentId: number
+  title: string
+  content?: string
+}
+
+export type UpdateAnnouncementInput = {
+  title?: string
+  content?: string
+}

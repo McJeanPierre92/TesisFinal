@@ -1,13 +1,17 @@
 import {
+  CreateAnnouncementInput,
   CreateLessonInput,
   CreateTaskInput,
   CreateTermGradeInput,
   GradeSubmissionInput,
   SubmitTaskInput,
+  UpdateAnnouncementInput,
   UpdateLessonInput,
   UpdateTaskInput
 } from './academicInputs'
 import {
+  Announcement,
+  MyAnnouncement,
   MyEnrollment,
   MyGrades,
   MyLesson,
@@ -26,6 +30,7 @@ export interface AcademicRepository {
   getMyClasses: () => Promise<MyEnrollment[]>
   getMyTasks: () => Promise<MyTask[]>
   getMyLessons: () => Promise<MyLesson[]>
+  getMyAnnouncements: () => Promise<MyAnnouncement[]>
   getMyGrades: () => Promise<MyGrades>
   submitTask: (taskId: number, data: SubmitTaskInput) => Promise<Submission>
   // Profesor
@@ -44,4 +49,9 @@ export interface AcademicRepository {
     data: GradeSubmissionInput
   ) => Promise<Grade>
   createTermGrade: (data: CreateTermGradeInput) => Promise<TermGrade>
+  // Anuncios
+  getTeacherAnnouncements: (assignmentId: number) => Promise<Announcement[]>
+  createAnnouncement: (data: CreateAnnouncementInput) => Promise<Announcement>
+  editAnnouncement: (id: number, data: UpdateAnnouncementInput) => Promise<Announcement>
+  deleteAnnouncement: (id: number) => Promise<void>
 }

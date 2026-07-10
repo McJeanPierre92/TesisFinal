@@ -216,6 +216,7 @@ model teachingAssignment {
   tasks      task[]
   schedules  schedule[]
   termGrades termGrade[]
+  announcements announcement[]
 
   // Una materia se asigna una sola vez por paralelo (un profesor por materia+paralelo)
   @@unique([subjectId, classGroupId])
@@ -342,4 +343,16 @@ model termGrade {
   updatedAt            DateTime           @default(now()) @updatedAt @db.Timestamptz(6)
 
   @@unique([teachingAssignmentId, studentId, term])
+}
+
+// Anuncio del profesor en un curso (tablón de avisos)
+model announcement {
+  id                   Int                @id @default(autoincrement())
+  teachingAssignmentId Int
+  teachingAssignment   teachingAssignment @relation(fields: [teachingAssignmentId], references: [id], onDelete: Cascade)
+  title                String             @db.VarChar(150)
+  content              String?            @db.Text
+  state                Boolean            @default(true) @db.Boolean
+  createdAt            DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime           @default(now()) @updatedAt @db.Timestamptz(6)
 }

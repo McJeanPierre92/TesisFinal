@@ -10,9 +10,13 @@ import {
 } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { apiAcademic } from '@/modules/academic/infrastructure/apiAcademic'
-import { GraduationCap, Award } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
+import { exportGradesToPDF } from '@/lib/exportGrades'
+import { GraduationCap, Award, FileDown } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'motion/react'
+import { toast } from 'sonner'
 import { PageHeader } from '@/section/lms/components/PageHeader'
 import { EmptyState } from '@/section/lms/components/EmptyState'
 import { MyGrades } from '@/modules/academic/domain/academic'
@@ -39,8 +43,23 @@ function barColor(pct: number): string {
 }
 
 export default function MyGradesPage() {
+  const { user } = useAuth()
   const [data, setData] = useState<MyGrades | null>(null)
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
+
+  const handleExport = async () => {
+    if (!data) return
+    setExporting(true)
+    try {
+      await exportGradesToPDF(data, user?.name ?? 'Alumno')
+      toast.success('PDF generado correctamente')
+    } catch (e: any) {
+      toast.error('Error al generar el PDF')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   useEffect(() => {
     academicApi
@@ -86,6 +105,19 @@ export default function MyGradesPage() {
         title='Mis Notas'
         subtitle='Calificaciones de tareas y parciales'
         tone='success'
+        actions={
+          hasData && (
+            <Button
+              onClick={handleExport}
+              disabled={exporting}
+              variant='outline'
+              size='sm'
+            >
+              <FileDown className='w-4 h-4 mr-1' />
+              {exporting ? 'Generando...' : 'Exportar PDF'}
+            </Button>
+          )
+        }
       />
 
       {!hasData ? (
