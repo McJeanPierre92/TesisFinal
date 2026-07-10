@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { getSubjectColor } from '@/constants/subjectColors'
 import { apiAcademic } from '@/modules/academic/infrastructure/apiAcademic'
 import { Lesson, Task, TeacherAssignment } from '@/modules/academic/domain/academic'
-import { BookOpen, Edit, FileText, Layers, Plus, Trash2 } from 'lucide-react'
+import { BookOpen, Edit, FileText, Layers, Megaphone, Plus, Trash2 } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -140,27 +140,33 @@ function ManageContentDialog({
 }) {
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
+  const [announcements, setAnnouncements] = useState<any[]>([])
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [editingAnnouncement, setEditingAnnouncement] = useState<any>(null)
   const [showLessonForm, setShowLessonForm] = useState(false)
   const [showTaskForm, setShowTaskForm] = useState(false)
+  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{
-    type: 'lesson' | 'task'
+    type: 'lesson' | 'task' | 'announcement'
     id: number
     title: string
   } | null>(null)
 
   const loadContent = async () => {
     try {
-      const [ls, ts] = await Promise.all([
+      const [ls, ts, an] = await Promise.all([
         academicApi.getTeacherLessons(assignment.id),
-        academicApi.getTeacherTasks(assignment.id)
+        academicApi.getTeacherTasks(assignment.id),
+        academicApi.getTeacherAnnouncements(assignment.id)
       ])
       setLessons(ls)
       setTasks(ts)
+      setAnnouncements(an)
     } catch {
       setLessons([])
       setTasks([])
+      setAnnouncements([])
     }
   }
 
@@ -174,9 +180,12 @@ function ManageContentDialog({
       if (deleteTarget.type === 'lesson') {
         await academicApi.deleteLesson(deleteTarget.id)
         toast.success('Lección eliminada')
-      } else {
+      } else if (deleteTarget.type === 'task') {
         await academicApi.deleteTask(deleteTarget.id)
         toast.success('Tarea eliminada')
+      } else if (deleteTarget.type === 'announcement') {
+        await academicApi.deleteAnnouncement(deleteTarget.id)
+        toast.success('Anuncio eliminado')
       }
       loadContent()
       onChanged()
@@ -198,6 +207,67 @@ function ManageContentDialog({
         </DialogHeader>
 
         <div className='space-y-6 py-2'>
+          {/* SECCIÓN ANUNCIOS */}
+          <div className='space-y-3'>
+            <div className='flex items-center justify-between'>
+              <h3 className='font-semibold text-foreground flex items-center gap-2'>
+                <Megaphone className='w-4 h-4 text-warning' />
+                Anuncios ({announcements.length})
+              </h3>
+              <Button
+                size='sm'
+                variant='outline'
+                onClick={() => {
+                  setEditingAnnouncement(null)
+                  setShowAnnouncementForm(true)
+                }}
+              >
+                <Plus className='w-4 h-4 mr-1' /> Nuevo
+              </Button>
+            </div>
+            {announcements.length === 0 ? (
+              <p className='text-sm text-muted-foreground py-2'>
+                Sin anuncios publicados.
+              </p>
+            ) : (
+              <div className='space-y-2'>
+                {announcements.map((a) => (
+                  <div key={a.id} className='manage-row'>
+                    <div>
+                      <div className='mr-title'>{a.title}</div>
+                      <div className='mr-meta'>
+                        {a.content ? a.content.slice(0, 80) + (a.content.length > 80 ? '...' : '') : ''}
+                        {' · '}
+                        {new Date(a.createdAt).toLocaleDateString('es-EC')}
+                      </div>
+                    </div>
+                    <div className='mr-actions'>
+                      <button
+                        className='btn-ghost'
+                        style={{ color: 'var(--primary)' }}
+                        onClick={() => {
+                          setEditingAnnouncement(a)
+                          setShowAnnouncementForm(true)
+                        }}
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        className='btn-ghost'
+                        style={{ color: 'var(--danger)' }}
+                        onClick={() =>
+                          setDeleteTarget({ type: 'announcement', id: a.id, title: a.title })
+                        }
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* SECCIÓN LECCIONES */}
           <div className='space-y-3'>
             <div className='flex items-center justify-between'>
@@ -355,6 +425,18 @@ function ManageContentDialog({
             loadContent()
             onChanged()
             setShowTaskForm(false)
+          }}
+        />
+      )}
+      {showAnnouncementForm && (
+        <AnnouncementFormDialog
+          assignmentId={assignment.id}
+          announcement={editingAnnouncement}
+          onClose={() => setShowAnnouncementForm(false)}
+          onSaved={() => {
+            loadContent()
+            onChanged()
+            setShowAnnouncementForm(false)
           }}
         />
       )}
@@ -752,6 +834,83 @@ function TaskFormDialog({
 
           <Button onClick={submit} disabled={saving || !title.trim()} className='w-full'>
             {saving ? 'Guardando...' : task ? 'Actualizar' : 'Crear'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============================================================
+//  Formulario de Anuncios
+// ============================================================
+function AnnouncementFormDialog({
+  assignmentId,
+  announcement,
+  onClose,
+  onSaved
+}: {
+  assignmentId: number
+  announcement: any
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [title, setTitle] = useState(announcement?.title ?? '')
+  const [content, setContent] = useState(announcement?.content ?? '')
+  const [saving, setSaving] = useState(false)
+
+  const submit = async () => {
+    if (!title.trim()) return
+    setSaving(true)
+    try {
+      if (announcement?.id) {
+        await academicApi.editAnnouncement(announcement.id, {
+          title,
+          content: content || undefined
+        })
+        toast.success('Anuncio actualizado')
+      } else {
+        await academicApi.createAnnouncement({
+          teachingAssignmentId: assignmentId,
+          title,
+          content: content || undefined
+        })
+        toast.success('Anuncio publicado')
+      }
+      onSaved()
+    } catch (e: any) {
+      toast.error(e.message || 'Error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{announcement ? 'Editar anuncio' : 'Nuevo anuncio'}</DialogTitle>
+        </DialogHeader>
+        <div className='space-y-3 py-2'>
+          <div className='space-y-2'>
+            <Label>Título</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder='Ej: Recordatorio: examen el viernes'
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>Contenido (opcional)</Label>
+            <Textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={4}
+              placeholder='Escribe el mensaje del anuncio...'
+            />
+          </div>
+          <Button onClick={submit} disabled={saving || !title.trim()} className='w-full'>
+            {saving ? 'Guardando...' : announcement ? 'Actualizar' : 'Publicar'}
           </Button>
         </div>
       </DialogContent>

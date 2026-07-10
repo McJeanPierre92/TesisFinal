@@ -184,6 +184,25 @@ export type MyLesson = Lesson & {
   }
 }
 
+/** Anuncio del tablón de un curso */
+export type Announcement = {
+  id: number
+  teachingAssignmentId: number
+  title: string
+  content?: string
+  state: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+/** Anuncio del alumno con info de la materia */
+export type MyAnnouncement = Announcement & {
+  teachingAssignment?: {
+    id: number
+    subject?: { id: number; name: string }
+  }
+}
+
 /** Resumen de notas del alumno (GET /academic/my-grades) */
 export type MyGrades = {
   submissions: (Submission & {

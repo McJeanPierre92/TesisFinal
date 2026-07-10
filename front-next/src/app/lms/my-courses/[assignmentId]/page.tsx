@@ -24,6 +24,7 @@ import {
   ChevronDown,
   FileText,
   Layers,
+  Megaphone,
   Paperclip,
   Upload
 } from 'lucide-react'
@@ -33,7 +34,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { EmptyState } from '@/section/lms/components/EmptyState'
 import { TaskStatusBadge } from '@/section/lms/components/TaskStatusBadge'
-import { MyLesson, MyTask } from '@/modules/academic/domain/academic'
+import { MyAnnouncement, MyLesson, MyTask } from '@/modules/academic/domain/academic'
 
 const academicApi = apiAcademic()
 
@@ -43,6 +44,7 @@ export default function CourseDetailPage() {
 
   const [lessons, setLessons] = useState<MyLesson[]>([])
   const [tasks, setTasks] = useState<MyTask[]>([])
+  const [announcements, setAnnouncements] = useState<MyAnnouncement[]>([])
   const [loading, setLoading] = useState(true)
   const [submitTaskId, setSubmitTaskId] = useState<number | null>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -64,7 +66,13 @@ export default function CourseDetailPage() {
         .then((all) =>
           setTasks(all.filter((t) => t.teachingAssignmentId === assignmentId))
         )
-        .catch(() => setTasks([]))
+        .catch(() => setTasks([])),
+      academicApi
+        .getMyAnnouncements()
+        .then((all) =>
+          setAnnouncements(all.filter((a) => a.teachingAssignmentId === assignmentId))
+        )
+        .catch(() => setAnnouncements([]))
     ]).finally(() => setLoading(false))
   }
 
@@ -130,7 +138,7 @@ export default function CourseDetailPage() {
         <div className='flex items-center justify-center py-20'>
           <div className='w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin' />
         </div>
-      ) : lessons.length === 0 && tasks.length === 0 ? (
+      ) : lessons.length === 0 && tasks.length === 0 && announcements.length === 0 ? (
         <EmptyState
           icon={BookOpen}
           title='Sin contenido publicado'
@@ -138,6 +146,42 @@ export default function CourseDetailPage() {
         />
       ) : (
         <div className='space-y-6'>
+          {/* SECCIÓN ANUNCIOS */}
+          {announcements.length > 0 && (
+            <div className='space-y-3'>
+              <h2 className='text-lg font-semibold text-foreground flex items-center gap-2 font-serif tracking-tight'>
+                <Megaphone className='w-5 h-5 text-warning' />
+                Anuncios ({announcements.length})
+              </h2>
+              <div className='space-y-3'>
+                {announcements.map((a) => (
+                  <Card key={a.id} className='border-warning/30'>
+                    <CardContent className='p-4'>
+                      <div className='flex items-start gap-3'>
+                        <div className='flex items-center justify-center w-9 h-9 rounded-lg bg-warning/15 text-warning-foreground shrink-0'>
+                          <Megaphone className='w-4 h-4' />
+                        </div>
+                        <div className='min-w-0 flex-1'>
+                          <h3 className='font-semibold text-foreground text-sm'>{a.title}</h3>
+                          {a.content && (
+                            <p className='text-sm text-muted-foreground mt-1 whitespace-pre-wrap'>
+                              {a.content}
+                            </p>
+                          )}
+                          <p className='text-xs text-muted-foreground/70 mt-2'>
+                            {new Date(a.createdAt).toLocaleDateString('es-EC', {
+                              day: 'numeric', month: 'long', year: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* SECCIÓN LECCIONES (acordeón) */}
           {lessons.length > 0 && (
             <div className='space-y-3'>

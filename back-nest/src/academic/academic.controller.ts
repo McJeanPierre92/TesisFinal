@@ -14,6 +14,7 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard'
 import { CurrentUser } from 'src/common/decorators/current-user.decorator'
 import { PermissionsGuard, RequirePermission } from 'src/common/guards/guard'
 import { AcademicService } from './academic.service'
+import { CreateAnnouncementByTeacherDto } from './dto/create-announcement-by-teacher.dto'
 import { CreateGradeByTeacherDto } from './dto/create-grade-by-teacher.dto'
 import { CreateLessonByTeacherDto } from './dto/create-lesson-by-teacher.dto'
 import { CreateSubmissionByStudentDto } from './dto/create-submission-by-student.dto'
@@ -180,5 +181,50 @@ export class AcademicController {
     @Param('id', ParseIntPipe) id: number
   ) {
     return this.academicService.deleteTaskByTeacher(teacherId, id)
+  }
+
+  // ---------------- ANUNCIOS (tablón del curso) ----------------
+
+  @Get('my-announcements')
+  @RequirePermission('academic', 'student-read')
+  findMyAnnouncements(@CurrentUser('id') studentId: number) {
+    return this.academicService.findMyAnnouncements(studentId)
+  }
+
+  @Get('teacher/announcements/:assignmentId')
+  @RequirePermission('academic', 'teacher-read')
+  findTeacherAnnouncements(
+    @CurrentUser('id') teacherId: number,
+    @Param('assignmentId', ParseIntPipe) assignmentId: number
+  ) {
+    return this.academicService.findTeacherAnnouncements(teacherId, assignmentId)
+  }
+
+  @Post('teacher/announcements')
+  @RequirePermission('academic', 'teacher-read')
+  createAnnouncementByTeacher(
+    @CurrentUser('id') teacherId: number,
+    @Body() dto: CreateAnnouncementByTeacherDto
+  ) {
+    return this.academicService.createAnnouncementByTeacher(teacherId, dto)
+  }
+
+  @Patch('teacher/announcements/:id')
+  @RequirePermission('academic', 'teacher-read')
+  updateAnnouncementByTeacher(
+    @CurrentUser('id') teacherId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateAnnouncementByTeacherDto
+  ) {
+    return this.academicService.updateAnnouncementByTeacher(teacherId, id, dto)
+  }
+
+  @Delete('teacher/announcements/:id')
+  @RequirePermission('academic', 'teacher-read')
+  deleteAnnouncementByTeacher(
+    @CurrentUser('id') teacherId: number,
+    @Param('id', ParseIntPipe) id: number
+  ) {
+    return this.academicService.deleteAnnouncementByTeacher(teacherId, id)
   }
 }
