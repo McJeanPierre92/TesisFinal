@@ -35,10 +35,11 @@ export class AuthController {
       loginDto.userName,
       loginDto.password
     )
+    const isSecure = process.env.FRONTEND_URL?.startsWith('https');
     res.cookie(TOKEN_NAME, result.sessionId, {
       httpOnly: true,
-      // secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
       maxAge: 24 * 60 * 60 * 1000
     })
 
@@ -56,10 +57,11 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(@Res({ passthrough: true }) res: Response) {
+    const isSecure = process.env.FRONTEND_URL?.startsWith('https');
     res.cookie(TOKEN_NAME, '', {
       httpOnly: true,
-      // secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
       expires: new Date(0)
     })
     return { message: 'Sesión cerrada correctamente' }
